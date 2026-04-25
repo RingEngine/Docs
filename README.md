@@ -19,6 +19,16 @@
 
 这些内容为后续的编译器、运行时、编辑器支持、校验工具和第三方生态接入提供统一依据。
 
+### 相关实现
+
+当前与这些文档直接对接的公开实现包括：
+
+- `compiler-js` 发布的 npm 包：
+  - `@ring-engine-org/filter-compiler-core@0.1.1`
+  - `@ring-engine-org/filter-packer@0.1.1`
+  - `@ring-engine-org/filter-cli@0.1.1`
+- `web-editor` 当前通过 `@ring-engine-org/filter-compiler-core` 在浏览器内编译 `filter-src`
+
 ### 仓库定位
 
 这个仓库会作为 Ring Engine 文档与标准的对外发布位置，主要承载：
@@ -55,6 +65,16 @@ The repository already includes an initial set of filter-related documents and s
 - `schemas/filter.schema.json`: the schema for the runtime `filter` package
 
 These assets provide a shared foundation for compilers, runtimes, editor tooling, validation tools, and third-party ecosystem integrations.
+
+### Related Implementations
+
+The current public implementations aligned with these docs include:
+
+- the `compiler-js` npm packages:
+  - `@ring-engine-org/filter-compiler-core@0.1.1`
+  - `@ring-engine-org/filter-packer@0.1.1`
+  - `@ring-engine-org/filter-cli@0.1.1`
+- `web-editor`, which compiles `filter-src` in the browser through `@ring-engine-org/filter-compiler-core`
 
 ### Repository Role
 
