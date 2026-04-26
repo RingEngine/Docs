@@ -609,6 +609,15 @@ binding 值必须匹配 pass 的反射元数据。
 
 `uniform` 绑定单个标量、向量或矩阵值。
 
+uniform block 和 storage buffer 使用固定 ABI 布局：
+
+- `uniformBlock` 声明编译为 `std140`。
+- `buffer` 声明编译为 `std430`。
+- 如果 GLSL block 声明没有写布局标准，编译器会在 shader backend 编译前自动注入所需标准。
+- 如果作者源码显式声明了不同的 block 布局标准，例如 uniform block 使用 `std430`，或 storage buffer 使用 `std140`，编译失败。
+
+编译后的反射会按这个固定布局记录 uniform block field 的字节 offset 和 size。runtime 必须按这些反射出的字节偏移打包 Lua table 值，不能猜测底层 backend 的原生结构体布局。
+
 uniform block field 当前支持的 `type` 值：
 
 - `float`

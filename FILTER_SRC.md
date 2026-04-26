@@ -609,6 +609,15 @@ Binding `type` values currently supported by the compiled manifest are:
 
 `uniform` binds a single scalar, vector, or matrix value.
 
+Uniform blocks and storage buffers use fixed ABI layouts:
+
+- `uniformBlock` declarations are compiled as `std140`.
+- `buffer` declarations are compiled as `std430`.
+- If a GLSL block declaration omits the layout standard, the compiler injects the required standard before shader backend compilation.
+- If author source explicitly declares a different block layout standard, such as `std430` on a uniform block or `std140` on a storage buffer, compilation fails.
+
+The compiled reflection records uniform block field offsets and sizes using this fixed layout. Runtimes must pack Lua table values according to those reflected byte offsets instead of relying on backend-native struct layout guesses.
+
 Uniform block field `type` values currently supported are:
 
 - `float`
