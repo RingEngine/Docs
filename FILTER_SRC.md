@@ -240,7 +240,10 @@ Valid `semantic` values:
 
 - components 0 and 1 are a 2D point in normalized device coordinates
 - components 0 and 1 are in `[-1, 1]`
-- components 2 and 3 are fixed to `0`
+- component 2 is fixed to `0`
+- component 3 is fixed to `1`
+
+In `vec4` form this is `[x, y, 0, 1]`.
 
 ### `mat4`
 

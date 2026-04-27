@@ -492,7 +492,231 @@
       ]
     },
     "parameter": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": false,
+      "x-description-zh-CN": "从源工程复制而来的单个公共参数定义。",
+      "required": [
+        "id",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-description-zh-CN": "参数逻辑 id。"
+        },
+        "label": {
+          "type": "string",
+          "description": "Editor-facing display label. Not used for compilation or runtime execution.",
+          "x-description-zh-CN": "面向编辑器和作者工具的显示标签，不参与编译和运行时执行。"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "bool",
+            "float",
+            "vec4",
+            "mat4"
+          ],
+          "x-description-zh-CN": "参数基础类型。"
+        },
+        "semantic": {
+          "type": "string",
+          "enum": [
+            "color3",
+            "color4",
+            "ndcPoint2"
+          ],
+          "x-description-zh-CN": "仅对特定类型生效的附加语义约定。当前用于 vec4。"
+        },
+        "default": {
+          "description": "Default parameter value.",
+          "x-description-zh-CN": "参数默认值。"
+        },
+        "min": {
+          "type": "number",
+          "x-description-zh-CN": "数值下界。当前仅对 float 有意义。"
+        },
+        "max": {
+          "type": "number",
+          "x-description-zh-CN": "数值上界。当前仅对 float 有意义。"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "bool"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "min"
+                  ]
+                },
+                {
+                  "required": [
+                    "max"
+                  ]
+                },
+                {
+                  "required": [
+                    "semantic"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "default": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "float"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "semantic"
+              ]
+            },
+            "properties": {
+              "default": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "vec4"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "min"
+                  ]
+                },
+                {
+                  "required": [
+                    "max"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "default": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "semantic"
+            ],
+            "properties": {
+              "type": {
+                "const": "vec4"
+              },
+              "semantic": {
+                "const": "ndcPoint2"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "default": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "prefixItems": [
+                  {
+                    "type": "number",
+                    "minimum": -1,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "number",
+                    "minimum": -1,
+                    "maximum": 1
+                  },
+                  {
+                    "const": 0
+                  },
+                  {
+                    "const": 1
+                  }
+                ],
+                "items": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "mat4"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "min"
+                  ]
+                },
+                {
+                  "required": [
+                    "max"
+                  ]
+                },
+                {
+                  "required": [
+                    "semantic"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "default": {
+                "type": "array",
+                "minItems": 16,
+                "maxItems": 16,
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "asset": {
       "type": "object",
