@@ -355,7 +355,9 @@ Lua workflow entry points:
 
 `onReset` is the reset boundary. Runtime objects created through `ctx` belong to the current reset scope.
 
-Lua global variables can exist, but reset-safe runtime state must be stored in runtime-managed objects created through `ctx`.
+Lua primitive values and Lua tables may be stored in global or module-level variables. Authors are responsible for initializing or clearing this Lua state in `onReset(...)` according to the reset boundary.
+
+Runtime objects that Lua cannot create, release, or rebind by itself must be managed through `ctx`, such as `Target`, `Buffer`, `Input`, `Output`, `Image`, and `Video`. Do not keep runtime objects acquired or created through `ctx` as Lua global references across resets. Create or retrieve them again through `ctx` after reset.
 
 ## Lua Reference Requirements
 
@@ -415,6 +417,188 @@ Available functions:
 `shape` is an array-like Lua table of positive integer dimensions. The total element count is the product of all dimensions.
 
 `getTarget` and `getBuffer` retrieve reset-scope objects by id.
+
+### `ctx:getParam`
+
+`ctx:getParam(id)` returns the current parameter value.
+
+Scalar parameters return `number` or `boolean`.
+
+Array parameters, such as `vec4` and `mat4`, return array-like Lua tables.
+
+For array parameters, the runtime uses a mutable snapshot for the current Lua entry call:
+
+- Each array parameter has a runtime-allocated snapshot table that is reused.
+- Before each Lua entry function call, including `onReset(...)` and `advance(ctx)`, that snapshot is marked as not prepared.
+- The first `ctx:getParam(id)` call for that parameter during the current entry call copies the host-current parameter value into the snapshot table and returns that table.
+- Later `ctx:getParam(id)` calls for the same `id` during the same entry call return the same snapshot table. They do not copy again and do not refresh existing references.
+- Lua may mutate this snapshot table. The mutation only affects that snapshot during the current Lua entry call. It does not write back to the host parameter and does not affect later Lua entry calls.
+
+Therefore, multiple reads of the same array parameter during one `advance(ctx)` call return the same table:
+
+```lua
+function advance(ctx)
+  local transform = ctx:getParam("transform")
+  mat4.translate(transform, 10, 0, 0)
+
+  local again = ctx:getParam("transform")
+  -- again is the same table as transform and includes the translate above.
+end
+```
+
+Do not keep an array table returned by `ctx:getParam(id)` as persistent state across `onReset(...)` or `advance(ctx)` calls.
+
+If a matrix or array must be preserved across multiple `advance(ctx)` calls, use an author-owned Lua table and initialize or clear it in `onReset(...)`. Do not keep the snapshot table returned by `ctx:getParam(id)` itself.
+
+```lua
+local drawTransform = {}
+
+function onReset(ctx)
+  mat4.identity(drawTransform)
+end
+
+function advance(ctx)
+  local sourceTransform = ctx:getParam("transform")
+
+  mat4.copy(drawTransform, sourceTransform)
+  mat4.translate(drawTransform, 10, 0, 0)
+
+  ctx:runRenderPass("draw", {
+    source = ctx:getInput(),
+    params = {
+      transform = drawTransform
+    }
+  }, ctx:getOutput())
+end
+```
+
+In this example, `drawTransform` is an author-owned Lua table. It is not a runtime object, so it may be stored in a Lua variable. The author is responsible for maintaining its reset boundary in `onReset(...)`.
+
+## `mat4`
+
+`mat4` is a runtime-injected Lua global library for 4x4 matrix calculation.
+
+Authors use `mat4` to compute matrix values for shaders, such as translation, scale, rotation, pixel-coordinate to NDC orthographic projection when output size changes, and point transformation through a matrix.
+
+A `mat4` value is a Lua table containing exactly 16 numbers. Matrices use column-major layout, matching GLSL `mat4` uniforms:
+
+```text
+m[1]  m[5]  m[9]   m[13]
+m[2]  m[6]  m[10]  m[14]
+m[3]  m[7]  m[11]  m[15]
+m[4]  m[8]  m[12]  m[16]
+```
+
+The `mat4` library does not provide `mat4.create()`. Authors create ordinary Lua tables for working matrices and fill them through `mat4` functions:
+
+```lua
+local transform = {}
+
+function advance(ctx)
+  mat4.identity(transform)
+  mat4.translate(transform, 100, 50, 0)
+  mat4.scale(transform, 200, 100, 1)
+
+  ctx:runRenderPass("draw", {
+    source = ctx:getInput(),
+    params = {
+      transform = transform
+    }
+  }, ctx:getOutput())
+end
+```
+
+In this example, `params.transform` is a uniform block field. For a loose uniform binding, pass the matrix through the corresponding binding name in `bindings`.
+
+### Basic Functions
+
+- `mat4.identity(m) -> m`
+- `mat4.copy(dst, src) -> dst`
+
+`identity` writes the identity matrix into `m`.
+
+`copy` copies the 16 components of `src` into `dst`.
+
+### Matrix Composition
+
+- `mat4.multiply(m, rhs) -> m`
+- `mat4.preMultiply(m, lhs) -> m`
+
+`multiply` means:
+
+```text
+m = m * rhs
+```
+
+`preMultiply` means:
+
+```text
+m = lhs * m
+```
+
+### Appending Transforms
+
+- `mat4.translate(m, x, y, z) -> m`
+- `mat4.scale(m, x, y, z) -> m`
+- `mat4.rotateX(m, radians) -> m`
+- `mat4.rotateY(m, radians) -> m`
+- `mat4.rotateZ(m, radians) -> m`
+
+These functions append a transform to the current matrix. For example, `mat4.translate(m, x, y, z)` means:
+
+```text
+m = m * T
+```
+
+where `T` is the translation matrix defined by `x`, `y`, and `z`.
+
+Rotation angles are in radians.
+
+### Setting Matrices
+
+- `mat4.setTranslation(m, x, y, z) -> m`
+- `mat4.setScale(m, x, y, z) -> m`
+- `mat4.setRotationX(m, radians) -> m`
+- `mat4.setRotationY(m, radians) -> m`
+- `mat4.setRotationZ(m, radians) -> m`
+- `mat4.setOrtho(m, left, right, bottom, top, near, far) -> m`
+
+`set*` functions overwrite the current contents of `m`. They do not append a transform to the existing matrix.
+
+`setOrtho` creates an orthographic projection matrix that maps the coordinate range defined by `left`, `right`, `bottom`, `top`, `near`, and `far` into NDC.
+
+For example, this maps output-canvas pixel coordinates to NDC, using a coordinate system whose upper-left corner is `(0, 0)` and whose y axis grows downward:
+
+```lua
+local proj = {}
+
+function advance(ctx)
+  local output = ctx:getOutput()
+  mat4.setOrtho(proj, 0, output:getWidth(), output:getHeight(), 0, -1, 1)
+
+  local ndcX, ndcY = mat4.transformPoint2(proj, output:getWidth() * 0.5, output:getHeight() * 0.5)
+  -- ndcX and ndcY are near 0.
+end
+```
+
+### Inversion, Transpose, And Point Transformation
+
+- `mat4.invert(m) -> boolean`
+- `mat4.transpose(m) -> m`
+- `mat4.transformPoint4(m, x, y, z, w) -> x2, y2, z2, w2`
+- `mat4.transformPoint2(m, x, y) -> x2, y2`
+
+`invert` inverts the matrix in place. It returns `false` if the matrix is not invertible. It returns `true` on success.
+
+`transpose` transposes the matrix in place.
+
+`transformPoint4` computes:
+
+```text
+[x2, y2, z2, w2] = m * [x, y, z, w]
+```
+
+`transformPoint2` is the 2D convenience form. It is equivalent to calling `transformPoint4` with `z = 0` and `w = 1`, then returning only `x2` and `y2`.
 
 ## Runtime Object Model
 
