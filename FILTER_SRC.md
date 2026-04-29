@@ -220,6 +220,7 @@ Valid `semantic` values:
 - `color3`
 - `color4`
 - `ndcPoint2`
+- `ndcRect`
 
 #### `color3`
 
@@ -244,6 +245,17 @@ Valid `semantic` values:
 - component 3 is fixed to `1`
 
 In `vec4` form this is `[x, y, 0, 1]`.
+
+#### `ndcRect`
+
+`ndcRect` means:
+
+- components 0 and 1 are the lower-left corner of a rectangle in normalized device coordinates
+- component 2 is the rectangle width, extending toward positive x
+- component 3 is the rectangle height, extending toward positive y
+- components 2 and 3 must be greater than or equal to `0`
+
+In `vec4` form this is `[x, y, w, h]`. The upper-right corner is `[x + w, y + h]`.
 
 ### `mat4`
 

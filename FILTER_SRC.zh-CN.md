@@ -220,6 +220,7 @@ outputRequest:setSize(width, height)
 - `color3`
 - `color4`
 - `ndcPoint2`
+- `ndcRect`
 
 #### `color3`
 
@@ -244,6 +245,17 @@ outputRequest:setSize(width, height)
 - 第 3 个分量固定为 `1`
 
 以 `vec4` 表示时即 `[x, y, 0, 1]`。
+
+#### `ndcRect`
+
+`ndcRect` 表示：
+
+- 第 0、1 个分量是归一化设备坐标中矩形的左下角
+- 第 2 个分量是矩形宽度，向 x 正方向延伸
+- 第 3 个分量是矩形高度，向 y 正方向延伸
+- 第 2、3 个分量必须大于或等于 `0`
+
+以 `vec4` 表示时即 `[x, y, w, h]`。右上角是 `[x + w, y + h]`。
 
 ### `mat4`
 
