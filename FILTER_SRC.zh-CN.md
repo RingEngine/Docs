@@ -365,6 +365,7 @@ Lua 无法自行创建、释放或重新绑定的 runtime 对象必须通过 `ct
 
 - `ctx:runRenderPass("toneRemap", { ... }, output)`
 - `ctx:runComputePass("histogramScatter", { ... }, dispatch)`
+- `ctx:clearOutput(output, color)`
 - 以 Lua table 字面量书写的 uniform block 字段表
 
 当这些名字直接写在源码中时：
@@ -405,6 +406,7 @@ ctx:runComputePass("histogramScatter", bindings, dispatch)
 - `ctx:createUIntBuffer(id, shape)`
 - `ctx:getBuffer(id)`
 - `ctx:getOutput()`
+- `ctx:clearOutput(output, color)`
 - `ctx:runRenderPass(passId, bindings, output)`
 - `ctx:runComputePass(passId, bindings, dispatch)`
 
@@ -645,6 +647,8 @@ end
 - `Target`
 - `Output`
 
+可写输出对象也可以通过 `ctx:clearOutput(output, color)` 清空到指定颜色。
+
 ### `ReadableData`
 
 可读数据对象可以作为 pass 执行时的数据 binding。
@@ -675,6 +679,23 @@ end
 `SystemOnly` 对象从 runtime API 获取，不由 Lua 创建。
 
 `Output` 是 `SystemOnly`。
+
+## `clearOutput`
+
+`ctx:clearOutput(output, color)` 把一个可写输出清空为已知颜色。
+
+`output` 必须是 `Target` 或 `Output`。
+
+`color` 是一个 Lua table，颜色分量使用 `0.0` 到 `1.0` 的归一化范围。它可以是数组形式，也可以是具名字段形式：
+
+```lua
+ctx:clearOutput(ctx:getOutput(), { 0.1, 0.1, 0.12, 1.0 })
+ctx:clearOutput(ctx:getTarget("tempA"), { r = 0, g = 0, b = 0, a = 1 })
+```
+
+如果省略 alpha，默认为 `1.0`。
+
+clear 是显式 runtime 命令。如果某个 output 的初始内容会影响结果，作者应在 render pass 之前调用它。
 
 ## `runRenderPass`
 

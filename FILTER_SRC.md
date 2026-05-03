@@ -365,6 +365,7 @@ The following forms use names written directly in source:
 
 - `ctx:runRenderPass("toneRemap", { ... }, output)`
 - `ctx:runComputePass("histogramScatter", { ... }, dispatch)`
+- `ctx:clearOutput(output, color)`
 - uniform block field tables written as Lua table literals
 
 When these names are written directly in source:
@@ -405,6 +406,7 @@ Available functions:
 - `ctx:createUIntBuffer(id, shape)`
 - `ctx:getBuffer(id)`
 - `ctx:getOutput()`
+- `ctx:clearOutput(output, color)`
 - `ctx:runRenderPass(passId, bindings, output)`
 - `ctx:runComputePass(passId, bindings, dispatch)`
 
@@ -645,6 +647,8 @@ Objects:
 - `Target`
 - `Output`
 
+Writable output objects can also be cleared through `ctx:clearOutput(output, color)`.
+
 ### `ReadableData`
 
 Readable data objects can be used as data bindings for pass execution.
@@ -675,6 +679,23 @@ Methods:
 `SystemOnly` objects are acquired from runtime APIs and are not created by Lua.
 
 `Output` is `SystemOnly`.
+
+## `clearOutput`
+
+`ctx:clearOutput(output, color)` clears a writable output to a known color.
+
+`output` must be `Target` or `Output`.
+
+`color` is a Lua table with normalized color components in the `0.0` to `1.0` range. It may be array-like or keyed:
+
+```lua
+ctx:clearOutput(ctx:getOutput(), { 0.1, 0.1, 0.12, 1.0 })
+ctx:clearOutput(ctx:getTarget("tempA"), { r = 0, g = 0, b = 0, a = 1 })
+```
+
+If alpha is omitted, it defaults to `1.0`.
+
+Clearing is an explicit runtime command. Authors should call it before render passes when the initial contents of an output matter.
 
 ## `runRenderPass`
 
