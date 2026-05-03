@@ -359,6 +359,27 @@ Lua primitive values and Lua tables may be stored in global or module-level vari
 
 Runtime objects that Lua cannot create, release, or rebind by itself must be managed through `ctx`, such as `Target`, `Buffer`, `Input`, `Output`, `Image`, and `Video`. Do not keep runtime objects acquired or created through `ctx` as Lua global references across resets. Create or retrieve them again through `ctx` after reset.
 
+### Available Lua Libraries
+
+The runtime exposes a fixed Lua library surface. Scripts must not depend on globals outside this list.
+
+Available standard Lua libraries:
+
+- `_G`
+- `math`
+- `string`
+- `table`
+
+Available runtime-injected globals:
+
+- `ctx`
+- `mat4`
+- `time`
+
+The `math` library includes Lua-style `math.random(...)` and `math.randomseed(seed)`. Random output is not repeatable unless the script explicitly calls `math.randomseed(seed)`.
+
+The `os`, `io`, `package`, and `debug` libraries are not part of the runtime contract.
+
 ## Lua Reference Requirements
 
 The following forms use names written directly in source:
@@ -366,6 +387,9 @@ The following forms use names written directly in source:
 - `ctx:runRenderPass("toneRemap", { ... }, output)`
 - `ctx:runComputePass("histogramScatter", { ... }, dispatch)`
 - `ctx:clearOutput(output, color)`
+- `time.now()`
+- `time.parts(out, timestamp, options)`
+- `time.fromDate(date, options)`
 - uniform block field tables written as Lua table literals
 
 When these names are written directly in source:
@@ -475,6 +499,100 @@ end
 ```
 
 In this example, `drawTransform` is an author-owned Lua table. It is not a runtime object, so it may be stored in a Lua variable. The author is responsible for maintaining its reset boundary in `onReset(...)`.
+
+## `time`
+
+`time` is a runtime-injected Lua global library for wall-clock time and calendar conversion.
+
+`time` is separate from the render timeline. Frame time, delta time, and frame index are runtime execution concepts and belong on `ctx` APIs rather than in `time`.
+
+Available functions:
+
+- `time.now() -> timestamp`
+- `time.parts(out, timestamp [, options]) -> out`
+- `time.fromDate(date [, options]) -> timestamp`
+
+### `time.now`
+
+`time.now()` returns the current Unix timestamp as seconds.
+
+The return value is a Lua `number`. It may include a fractional part and must provide at least millisecond precision.
+
+### `time.parts`
+
+`time.parts(out, timestamp [, options])` decomposes a timestamp into calendar fields.
+
+`timestamp` is Unix time in seconds. It may include a fractional part.
+
+`out` must be a Lua table. The runtime writes fields into `out` and returns `out`, so authors can reuse the same table across frames.
+
+`options` is an optional Lua table. Supported fields:
+
+- `utc`: when `true`, use UTC. Otherwise, use the runtime's local time zone.
+
+Fields written to `out`:
+
+- `year`: full year
+- `month`: `1` to `12`
+- `day`: `1` to `31`
+- `hour`: `0` to `23`
+- `min`: `0` to `59`
+- `sec`: `0` to `59`
+- `millis`: `0` to `999`
+- `wday`: `1` to `7`, Sunday is `1`
+- `yday`: `1` to `366`, January 1 is `1`
+
+Example:
+
+```lua
+local wall = {}
+
+function advance(ctx)
+  time.parts(wall, time.now(), { utc = true })
+
+  ctx:runRenderPass("draw", {
+    params = {
+      clock = { wall.hour, wall.min, wall.sec, wall.millis }
+    }
+  }, ctx:getOutput())
+end
+```
+
+### `time.fromDate`
+
+`time.fromDate(date [, options])` converts date fields into a Unix timestamp in seconds.
+
+`date` is a Lua table. `time.fromDate` reads only these fields:
+
+- `year`: required
+- `month`: required
+- `day`: required
+- `hour`: optional, defaults to `0`
+- `min`: optional, defaults to `0`
+- `sec`: optional, defaults to `0`
+- `millis`: optional, defaults to `0`
+
+The input date fields are normalized by calendar rules before conversion. Derived fields such as `wday` and `yday` are not read by `time.fromDate`.
+
+`options` is an optional Lua table. Supported fields:
+
+- `utc`: when `true`, interpret the input as UTC. Otherwise, interpret it in the runtime's local time zone.
+
+Example:
+
+```lua
+local launchAt = time.fromDate({
+  year = 2026,
+  month = 5,
+  day = 3,
+  hour = 20,
+  min = 30,
+  sec = 0,
+  millis = 250
+}, { utc = true })
+```
+
+`time.parts` and `time.fromDate` use separate table shapes. Some field names are shared because they describe the same calendar concepts, but `time.parts` output is not the required input structure for `time.fromDate`.
 
 ## `mat4`
 
