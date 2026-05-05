@@ -924,13 +924,27 @@ binding 值必须匹配 pass 的反射元数据。
 
 编译后包 manifest 拥有独立 schema，因为它由 `filter-runtime` 消费；`filter-src/manifest.json` 则由作者工具和编译器消费。
 
-编译后的 pass 记录会直接在 pass 对象上暴露面向 runtime 的绑定数据：
+## 编译后 manifest 的反射字段
 
-- `bindings`
-- compute pass 使用 `localSize`
-- render pass 使用 `vertexInput`
+编译后的包 manifest 来自 `filter-src/manifest.json`。它的顶层元数据、parameters、assets 和 pass 列表保持相同的整体形状，但 compiler 会替换只属于源码工程的 shader 字段，并补齐 runtime 需要的反射字段。
+
+实际可以理解为：编译后的 manifest 是源 manifest 加上这些面向 runtime 的字段：
+
+- `stages`：替代源码里的 shader 字段，指向编译后的 shader 路径。render pass 包含 `stages.vertex` 和 `stages.fragment`；compute pass 包含 `stages.compute`。
+- `bindings`：该 pass 的 runtime binding 反射。
+- `localSize`：从 compute shader 反射出的 workgroup size。
+- `vertexInput`：从 render vertex shader 反射出的顶点输入。
 
 编译后的 pass 记录中没有外层 `reflection` 包装字段。
+
+这些反射字段是面向 backend 的装载事实。它们描述 runtime 应该如何为已编译 backend 绑定资源；Lua 代码仍然按 binding `name` 传入值。
+
+每个 `bindings` 条目包含：
+
+- `name`：Lua 在 `ctx:runRenderPass` 或 `ctx:runComputePass` 中使用的 binding key。
+- `set`：backend descriptor set。对于 WGSL/WebGPU 输出，它映射到 `@group(set)`。
+- `binding`：`set` 内的 backend binding 编号。对于 WGSL/WebGPU 的 `sampledImage`，它表示 texture binding。
+- `type`：反射出的 binding 类型。
 
 编译后 manifest 当前支持的 binding `type` 值：
 
@@ -941,11 +955,21 @@ binding 值必须匹配 pass 的反射元数据。
 
 `sampledImage` 将 image-like runtime 对象绑定为 sampled texture 输入。
 
+`sampledImage.samplerBinding` 如果存在，表示 WGSL/WebGPU 中与 texture binding 配套的 sampler binding，且位于同一个 `set`。它的存在是因为 WGSL 会把 GLSL `sampler2D` 拆成 texture binding 和 sampler binding。保留 combined sampled image 的 native runtime 不需要输出这个字段。
+
 `buffer` 绑定通过 `ctx:createFloatBuffer` 或 `ctx:createUIntBuffer` 创建的 `Buffer` 对象。
+
+`buffer.access` 是反射出的 shader 访问模式。
+
+`buffer.elementType` 是 runtime buffer binding 使用的数组元素类型。
 
 `uniformBlock` 将 Lua table 绑定到结构化 uniform block。table 的 key 是 field 名。
 
+`uniformBlock.fields` 列出反射出的字段。每个 field 包含 `name`、`type`、字节 `offset` 和字节 `size`。
+
 `uniform` 绑定单个标量、向量或矩阵值。
+
+`uniform.valueType` 是 Lua 需要传入的标量、向量或矩阵类型。
 
 uniform block 和 storage buffer 使用固定 ABI 布局：
 

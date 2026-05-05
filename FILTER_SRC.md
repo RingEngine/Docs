@@ -924,13 +924,27 @@ When present, the compiled package `$schema` should reference:
 
 The compiled package manifest has its own schema because it is consumed by `filter-runtime`, while `filter-src/manifest.json` is consumed by authoring tools and the compiler.
 
-Compiled pass records expose runtime-facing binding data directly on the pass object:
+## Compiled Manifest Reflection Fields
 
-- `bindings`
-- `localSize` for compute passes
-- `vertexInput` for render passes
+The compiled package manifest is derived from `filter-src/manifest.json`. Its top-level metadata, parameters, assets, and pass list keep the same overall shape, but the compiler replaces source-only shader fields and fills in runtime reflection fields.
 
-There is no outer `reflection` wrapper in the compiled pass record.
+In practice, the compiled manifest is the source manifest plus these runtime-facing fields:
+
+- `stages`: replaces source shader fields with compiled shader paths. Render passes contain `stages.vertex` and `stages.fragment`; compute passes contain `stages.compute`.
+- `bindings`: reflected runtime bindings for the pass.
+- `localSize`: compute workgroup size reflected from a compute shader.
+- `vertexInput`: render vertex input reflected from a render vertex shader.
+
+There is no outer `reflection` wrapper. These fields live directly on each compiled pass record.
+
+The reflected fields are backend-facing loading facts. They describe how a runtime should bind resources for the compiled backend; Lua code still supplies values by binding `name`.
+
+Each `bindings` entry includes:
+
+- `name`: the Lua binding key used in `ctx:runRenderPass` or `ctx:runComputePass`.
+- `set`: the backend descriptor set. For WGSL/WebGPU output, this maps to `@group(set)`.
+- `binding`: the backend binding number within `set`. For WGSL/WebGPU `sampledImage` bindings, this is the texture binding.
+- `type`: the reflected binding kind.
 
 Binding `type` values currently supported by the compiled manifest are:
 
@@ -941,11 +955,21 @@ Binding `type` values currently supported by the compiled manifest are:
 
 `sampledImage` binds an image-like runtime object as a sampled texture input.
 
+`sampledImage.samplerBinding`, when present, is the WGSL/WebGPU sampler binding paired with the texture binding in the same `set`. It exists because WGSL separates a GLSL `sampler2D` into a texture binding and a sampler binding. Native runtimes that keep combined sampled images do not need to emit this field.
+
 `buffer` binds a `Buffer` object created with `ctx:createFloatBuffer` or `ctx:createUIntBuffer`.
+
+`buffer.access` is the reflected shader access mode.
+
+`buffer.elementType` is the array element type used by the runtime buffer binding.
 
 `uniformBlock` binds a Lua table to a structured uniform block. The table keys are field names.
 
+`uniformBlock.fields` lists reflected fields. Each field has `name`, `type`, byte `offset`, and byte `size`.
+
 `uniform` binds a single scalar, vector, or matrix value.
+
+`uniform.valueType` is the scalar, vector, or matrix type expected from Lua.
 
 Uniform blocks and storage buffers use fixed ABI layouts:
 
