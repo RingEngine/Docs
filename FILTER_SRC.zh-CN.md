@@ -22,6 +22,7 @@ filter-src/
 
 - runtime contract 版本
 - 输出尺寸决定模式
+- 可选 runtime 调度提示
 - 可选工程元信息
 - 公共参数
 - pass 源文件
@@ -41,6 +42,7 @@ manifest 根对象包含以下字段：
 - `schemaVersion`
 - `runtimeVersion`
 - `outputSizeMode`
+- `runtimeHints`
 - `metadata`
 - `parameters`
 - `passes`
@@ -52,7 +54,7 @@ manifest 根对象包含以下字段：
 
 `outputSizeMode` 缺省时默认是 `passive`。
 
-`metadata`、`parameters` 和 `assets` 是可选字段。
+`runtimeHints`、`metadata`、`parameters` 和 `assets` 是可选字段。
 
 ## `$schema`
 
@@ -133,6 +135,29 @@ outputRequest:setSize(width, height)
 ```
 
 `width` 和 `height` 是正整数尺寸。
+
+## `runtimeHints`
+
+`runtimeHints` 包含可选的宿主侧提示，用来描述 filter 在 runtime 中可能如何变化。这些提示属于源码和编译后 manifest contract，但不覆盖宿主自身的调度策略。
+
+支持字段：
+
+- `frameInvalidation`
+
+### `frameInvalidation`
+
+`frameInvalidation` 描述当输入媒体和公共参数都没有变化时，filter 输出是否仍可能变化。
+
+合法值：
+
+- `onChange`
+- `continuous`
+
+缺省时为 `onChange`。
+
+`onChange` 表示输出通常在输入、参数、reset-scope 资源或其它宿主可见 runtime 依赖变化之前保持稳定。
+
+`continuous` 表示即使输入是静态图片、参数也没有变化，输出仍可能随着渲染时间线推进而变化。作者工具和 runtime 可以用这个 hint 对静态输入持续调度渲染。宿主仍可以根据自身产品需求进行限频、暂停或覆盖调度。
 
 ## `metadata`
 
@@ -430,6 +455,9 @@ ctx:runComputePass("histogramScatter", bindings, dispatch)
 - `ctx:createUIntBuffer(id, shape)`
 - `ctx:getBuffer(id)`
 - `ctx:getOutput()`
+- `ctx:getFrameIndex()`
+- `ctx:getTimeSeconds()`
+- `ctx:getDeltaSeconds()`
 - `ctx:clearOutput(output, color)`
 - `ctx:runRenderPass(passId, bindings, output)`
 - `ctx:runComputePass(passId, bindings, dispatch)`
@@ -500,6 +528,22 @@ end
 
 上例中的 `drawTransform` 是 Lua 自己拥有的 table。它不是 runtime 对象，因此可以保存在 Lua 变量中；作者负责在 `onReset(...)` 中维护它的 reset 边界。
 
+### 渲染时间线
+
+渲染时间线通过 `ctx` 暴露，而不是通过 `time` 库暴露：
+
+- `ctx:getFrameIndex() -> integer`
+- `ctx:getTimeSeconds() -> number`
+- `ctx:getDeltaSeconds() -> number`
+
+`ctx:getFrameIndex()` 返回当前 `advance(ctx)` 调用的从 0 开始的逻辑帧序号。
+
+`ctx:getTimeSeconds()` 返回当前 `advance(ctx)` 调用的逻辑渲染时间，单位为秒。
+
+`ctx:getDeltaSeconds()` 返回同一个 reset scope 内，距离上一次 `advance(ctx)` 调用的逻辑经过时间，单位为秒。reset 后第一帧返回 `0`。
+
+实时预览、交互编辑、视频播放和离线 composite 可以用不同方式推进这条时间线。Lua 应使用这些 `ctx` 函数实现动画和帧相关渲染，而不是根据渲染环境分支。
+
 ## `time`
 
 `time` 是 runtime 注入的 Lua 全局库，用于 wall-clock 时间和日历转换。
@@ -517,6 +561,8 @@ end
 `time.now()` 返回当前 Unix timestamp，单位为秒。
 
 返回值是 Lua `number`。它可以包含小数部分，并且必须至少提供毫秒精度。
+
+`time.now()` 适合用于 wall-clock 和日历相关行为，例如日期彩蛋或节日变体。动画应使用 `ctx:getTimeSeconds()`、`ctx:getDeltaSeconds()` 或 `ctx:getFrameIndex()`。
 
 ### `time.parts`
 
@@ -926,7 +972,7 @@ binding 值必须匹配 pass 的反射元数据。
 
 ## 编译后 manifest 的反射字段
 
-编译后的包 manifest 来自 `filter-src/manifest.json`。它的顶层元数据、parameters、assets 和 pass 列表保持相同的整体形状，但 compiler 会替换只属于源码工程的 shader 字段，并补齐 runtime 需要的反射字段。
+编译后的包 manifest 来自 `filter-src/manifest.json`。它的顶层元数据、runtime hints、parameters、assets 和 pass 列表保持相同的整体形状，但 compiler 会替换只属于源码工程的 shader 字段，并补齐 runtime 需要的反射字段。
 
 实际可以理解为：编译后的 manifest 是源 manifest 加上这些面向 runtime 的字段：
 

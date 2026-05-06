@@ -22,6 +22,7 @@ It defines:
 
 - the runtime contract version
 - the output size decision mode
+- optional runtime scheduling hints
 - optional project metadata
 - public parameters
 - pass source files
@@ -41,6 +42,7 @@ The manifest root object has these fields:
 - `schemaVersion`
 - `runtimeVersion`
 - `outputSizeMode`
+- `runtimeHints`
 - `metadata`
 - `parameters`
 - `passes`
@@ -52,7 +54,7 @@ The manifest root object has these fields:
 
 `outputSizeMode` defaults to `passive` when omitted.
 
-`metadata`, `parameters`, and `assets` are optional.
+`runtimeHints`, `metadata`, `parameters`, and `assets` are optional.
 
 ## `$schema`
 
@@ -133,6 +135,29 @@ outputRequest:setSize(width, height)
 ```
 
 `width` and `height` are positive integer dimensions.
+
+## `runtimeHints`
+
+`runtimeHints` contains optional host-facing hints about how a filter may behave at runtime. These hints are part of the authoring and compiled manifest contract, but they do not override host scheduling policy.
+
+Supported fields:
+
+- `frameInvalidation`
+
+### `frameInvalidation`
+
+`frameInvalidation` describes whether the filter output is expected to change when input media and public parameters are unchanged.
+
+Valid values:
+
+- `onChange`
+- `continuous`
+
+When omitted, the value is `onChange`.
+
+`onChange` means the output is assumed stable until an input, parameter, reset-scope resource, or other host-visible runtime dependency changes.
+
+`continuous` means the output may change as the render timeline advances even if the input is a still image and parameters are unchanged. Authoring tools and runtimes may use this hint to keep scheduling renders for static inputs. Hosts may still throttle, pause, or override scheduling based on their product needs.
 
 ## `metadata`
 
@@ -430,6 +455,9 @@ Available functions:
 - `ctx:createUIntBuffer(id, shape)`
 - `ctx:getBuffer(id)`
 - `ctx:getOutput()`
+- `ctx:getFrameIndex()`
+- `ctx:getTimeSeconds()`
+- `ctx:getDeltaSeconds()`
 - `ctx:clearOutput(output, color)`
 - `ctx:runRenderPass(passId, bindings, output)`
 - `ctx:runComputePass(passId, bindings, dispatch)`
@@ -500,6 +528,22 @@ end
 
 In this example, `drawTransform` is an author-owned Lua table. It is not a runtime object, so it may be stored in a Lua variable. The author is responsible for maintaining its reset boundary in `onReset(...)`.
 
+### Render Timeline
+
+The render timeline is exposed through `ctx`, not the `time` library:
+
+- `ctx:getFrameIndex() -> integer`
+- `ctx:getTimeSeconds() -> number`
+- `ctx:getDeltaSeconds() -> number`
+
+`ctx:getFrameIndex()` returns the zero-based logical frame index for the current `advance(ctx)` call.
+
+`ctx:getTimeSeconds()` returns logical render time in seconds for the current `advance(ctx)` call.
+
+`ctx:getDeltaSeconds()` returns the logical elapsed time in seconds since the previous `advance(ctx)` call in the same reset scope. The first frame after reset returns `0`.
+
+Realtime preview, interactive editing, video playback, and offline composite may advance this timeline differently. Lua should use these `ctx` functions for animation and frame-dependent rendering instead of branching on the render environment.
+
 ## `time`
 
 `time` is a runtime-injected Lua global library for wall-clock time and calendar conversion.
@@ -517,6 +561,8 @@ Available functions:
 `time.now()` returns the current Unix timestamp as seconds.
 
 The return value is a Lua `number`. It may include a fractional part and must provide at least millisecond precision.
+
+Use `time.now()` for wall-clock and calendar-dependent behavior, such as date-based effects or seasonal variants. Use `ctx:getTimeSeconds()`, `ctx:getDeltaSeconds()`, or `ctx:getFrameIndex()` for animation.
 
 ### `time.parts`
 
@@ -926,7 +972,7 @@ The compiled package manifest has its own schema because it is consumed by `filt
 
 ## Compiled Manifest Reflection Fields
 
-The compiled package manifest is derived from `filter-src/manifest.json`. Its top-level metadata, parameters, assets, and pass list keep the same overall shape, but the compiler replaces source-only shader fields and fills in runtime reflection fields.
+The compiled package manifest is derived from `filter-src/manifest.json`. Its top-level metadata, runtime hints, parameters, assets, and pass list keep the same overall shape, but the compiler replaces source-only shader fields and fills in runtime reflection fields.
 
 In practice, the compiled manifest is the source manifest plus these runtime-facing fields:
 
