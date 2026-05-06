@@ -266,6 +266,7 @@ Valid `semantic` values:
 
 - components 0 and 1 are a 2D point in normalized device coordinates
 - components 0 and 1 are in `[-1, 1]`
+- Ring NDC uses x to the right and y downward; `[-1, -1]` is the upper-left corner
 - component 2 is fixed to `0`
 - component 3 is fixed to `1`
 
@@ -275,12 +276,12 @@ In `vec4` form this is `[x, y, 0, 1]`.
 
 `ndcRect` means:
 
-- components 0 and 1 are the lower-left corner of a rectangle in normalized device coordinates
+- components 0 and 1 are the upper-left corner of a rectangle in normalized device coordinates
 - component 2 is the rectangle width, extending toward positive x
-- component 3 is the rectangle height, extending toward positive y
+- component 3 is the rectangle height, extending toward positive y, which is downward in Ring NDC
 - components 2 and 3 must be greater than or equal to `0`
 
-In `vec4` form this is `[x, y, w, h]`. The upper-right corner is `[x + w, y + h]`.
+In `vec4` form this is `[x, y, w, h]`. The lower-right corner is `[x + w, y + h]`.
 
 ### `mat4`
 
@@ -320,6 +321,8 @@ A render pass has:
 A render pass uses the runtime fullscreen render model.
 
 The vertex shader for a render pass must contain exactly one `in vec2` vertex input. That input is the fullscreen position input. The reflected input identity is recorded for runtime use.
+
+The fullscreen position input uses Ring NDC: `[-1, -1]` is the upper-left corner, `[1, 1]` is the lower-right corner, x grows to the right, and y grows downward. This matches Vulkan-style viewport coordinates. Texture coordinates use `[0, 0]` at the upper-left corner, `[1, 1]` at the lower-right corner, x grows to the right, and y grows downward.
 
 Lua does not provide vertex attributes and does not control draw submission.
 
@@ -740,7 +743,7 @@ local proj = {}
 
 function advance(ctx)
   local output = ctx:getOutput()
-  mat4.setOrtho(proj, 0, output:getWidth(), output:getHeight(), 0, -1, 1)
+  mat4.setOrtho(proj, 0, output:getWidth(), 0, output:getHeight(), -1, 1)
 
   local ndcX, ndcY = mat4.transformPoint2(proj, output:getWidth() * 0.5, output:getHeight() * 0.5)
   -- ndcX and ndcY are near 0.

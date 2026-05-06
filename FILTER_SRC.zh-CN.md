@@ -266,6 +266,7 @@ outputRequest:setSize(width, height)
 
 - 第 0、1 个分量是归一化设备坐标中的二维点
 - 第 0、1 个分量范围是 `[-1, 1]`
+- Ring NDC 中 x 向右增长，y 向下增长；`[-1, -1]` 是左上角
 - 第 2 个分量固定为 `0`
 - 第 3 个分量固定为 `1`
 
@@ -275,12 +276,12 @@ outputRequest:setSize(width, height)
 
 `ndcRect` 表示：
 
-- 第 0、1 个分量是归一化设备坐标中矩形的左下角
+- 第 0、1 个分量是归一化设备坐标中矩形的左上角
 - 第 2 个分量是矩形宽度，向 x 正方向延伸
-- 第 3 个分量是矩形高度，向 y 正方向延伸
+- 第 3 个分量是矩形高度，向 y 正方向延伸；Ring NDC 中 y 正方向向下
 - 第 2、3 个分量必须大于或等于 `0`
 
-以 `vec4` 表示时即 `[x, y, w, h]`。右上角是 `[x + w, y + h]`。
+以 `vec4` 表示时即 `[x, y, w, h]`。右下角是 `[x + w, y + h]`。
 
 ### `mat4`
 
@@ -320,6 +321,8 @@ render pass 包含：
 render pass 使用 runtime fullscreen render model。
 
 render pass 的 vertex shader 必须包含且只包含一个 `in vec2` 顶点输入。这个输入是 fullscreen position input。该输入的反射身份会被记录供 runtime 使用。
+
+fullscreen position input 使用 Ring NDC：`[-1, -1]` 是左上角，`[1, 1]` 是右下角，x 向右增长，y 向下增长。这个约定与 Vulkan 风格的 viewport 坐标一致。纹理坐标使用 `[0, 0]` 作为左上角、`[1, 1]` 作为右下角，x 向右增长，y 向下增长。
 
 Lua 不提供 vertex attribute，也不控制 draw submission。
 
@@ -740,7 +743,7 @@ local proj = {}
 
 function advance(ctx)
   local output = ctx:getOutput()
-  mat4.setOrtho(proj, 0, output:getWidth(), output:getHeight(), 0, -1, 1)
+  mat4.setOrtho(proj, 0, output:getWidth(), 0, output:getHeight(), -1, 1)
 
   local ndcX, ndcY = mat4.transformPoint2(proj, output:getWidth() * 0.5, output:getHeight() * 0.5)
   -- ndcX 和 ndcY 接近 0。
