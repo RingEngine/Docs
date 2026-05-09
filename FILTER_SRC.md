@@ -65,7 +65,7 @@ It does not participate in compilation or runtime execution.
 Example:
 
 ```json
-"$schema": "https://raw.githubusercontent.com/RingEngine/Docs/runtime-1/schemas/filter-src.schema.json"
+"$schema": "https://raw.githubusercontent.com/RingEngine/docs/runtime-1/schemas/filter-src.schema.json"
 ```
 
 Schema in this repository:
@@ -968,7 +968,7 @@ Schema in this repository:
 When present, the compiled package `$schema` should reference:
 
 ```json
-"$schema": "https://raw.githubusercontent.com/RingEngine/Docs/runtime-1/schemas/filter.schema.json"
+"$schema": "https://raw.githubusercontent.com/RingEngine/docs/runtime-1/schemas/filter.schema.json"
 ```
 
 The compiled package manifest has its own schema because it is consumed by `filter-runtime`, while `filter-src/manifest.json` is consumed by authoring tools and the compiler.

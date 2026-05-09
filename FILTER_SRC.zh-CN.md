@@ -65,7 +65,7 @@ manifest 根对象包含以下字段：
 示例：
 
 ```json
-"$schema": "https://raw.githubusercontent.com/RingEngine/Docs/runtime-1/schemas/filter-src.schema.json"
+"$schema": "https://raw.githubusercontent.com/RingEngine/docs/runtime-1/schemas/filter-src.schema.json"
 ```
 
 本仓库中的 schema：
@@ -968,7 +968,7 @@ binding 值必须匹配 pass 的反射元数据。
 如果编译后包包含 `$schema`，它应引用：
 
 ```json
-"$schema": "https://raw.githubusercontent.com/RingEngine/Docs/runtime-1/schemas/filter.schema.json"
+"$schema": "https://raw.githubusercontent.com/RingEngine/docs/runtime-1/schemas/filter.schema.json"
 ```
 
 编译后包 manifest 拥有独立 schema，因为它由 `filter-runtime` 消费；`filter-src/manifest.json` 则由作者工具和编译器消费。
